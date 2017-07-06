@@ -1,0 +1,304 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8"/>
+    <title>Arvore Societária 2.0</title>
+
+    <style type="text/css">
+    body, select {
+      font: 10pt sans;
+    }
+    #network {
+      position:relative;
+      width: 320px;
+      height: 420px;
+      border: 1px solid lightgray;
+    }
+    table.legend_table {
+      font-size: 11px;
+      border-width:1px;
+      border-color:#d3d3d3;
+      border-style:solid;
+    }
+    table.legend_table,td {
+      border-width:1px;
+      border-color:#d3d3d3;
+      border-style:solid;
+      padding: 2px;
+    }
+    div.table_content {
+      width:80px;
+      text-align:center;
+    }
+    div.table_description {
+      width:100px;
+    }
+
+    #operation {
+      font-size:28px;
+    }
+    #network-popUp {
+      display:none;
+      position:absolute;
+      top:60px;
+      left:20px;
+      z-index:299;
+      width:260px;
+      height:120px;
+      background-color: #f9f9f9;
+      border-style:solid;
+      border-width:3px;
+      border-color: #5394ed;
+      padding:10px;
+      text-align: center;
+    }
+	        #config {
+                float:left;
+                width: 320px;
+                height: 420px;
+            }
+            #input_output {
+                height: 5%;
+                width: 90%;
+            }
+  </style>
+    <script type="text/javascript" src="exampleUtil.js"></script>
+    <script type="text/javascript" src="vis.js"></script>
+    <link href="vis-network.min.css" rel="stylesheet" type="text/css" />
+
+    <script type="text/javascript">
+    var nodes = null;
+    var edges = null;
+    var network;
+	//variaveis do save
+            var container;
+            var exportArea;
+            var importButton;
+            var exportButton;
+    // randomly create some nodes and edges
+    var data = getScaleFreeNetwork(0);
+    var seed = 2;
+
+    function destroyNetwork() {
+        network.destroy();
+    }
+
+    function draw() {
+      nodes = [];
+      edges = [];
+
+      // create a network
+      var container = document.getElementById('network');
+      var options = {
+		layout: {
+		randomSeed:seed,
+		improvedLayout:true,
+                    hierarchical: {
+                        direction: 'DU',
+						parentCentralization:  true,
+						sortMethod: 'hubsize',
+                    },
+		}, // just to make sure the layout is the same when the locale is changed
+        locale: 'pt-br',
+		edges:{
+			arrows: 'to',
+			smooth: {
+			  enabled: true,
+			  type: "dynamic",
+			  roundness: 0.5
+			},
+		},
+		nodes:{
+			shape: 'box',
+		},
+		interaction: {
+          navigationButtons: true,
+          keyboard: false,
+		  hover: false,
+		  selectConnectedEdges: true,
+        },
+        manipulation: {
+			initiallyActive: true,
+          addNode: function (data, callback) {
+            // filling in the popup DOM elements
+            document.getElementById('operation').innerHTML = "Empresa";
+            document.getElementById('node-id').value = data.id;
+            document.getElementById('node-label').value = data.label;
+            document.getElementById('saveButton').onclick = saveData.bind(this, data, callback);
+            document.getElementById('cancelButton').onclick = clearPopUp.bind();
+            document.getElementById('network-popUp').style.display = 'block';
+          },
+          editNode: false,
+          addEdge: function (Data, callback) {
+
+			if (Data.from !== Data.to) {
+				Data.label = prompt("Por favor digite o valor do investimento em ações", "");
+                callback(Data);
+            }
+            else {
+              window.alert("Não é possível realizar essa ação");
+			  callback(Data);
+            }
+          },
+			editEdge: false,
+        }
+      };
+      network = new vis.Network(container, data, options, {manipulation:{enabled:true}});
+	  clearOutputArea();
+    }
+
+    function clearPopUp() {
+      document.getElementById('saveButton').onclick = null;
+      document.getElementById('cancelButton').onclick = null;
+      document.getElementById('network-popUp').style.display = 'none';
+    }
+
+    function cancelEdit(callback) {
+      clearPopUp();
+      callback(null);
+    }
+
+    function saveData(data,callback) {
+      data.id = document.getElementById('node-id').value;
+      data.label = document.getElementById('node-label').value;
+      clearPopUp();
+      callback(data);
+    }
+
+    function init() {
+                container = document.getElementById('mynetwork');
+                exportArea = document.getElementById('input_output');
+                importButton = document.getElementById('import_button');
+                exportButton = document.getElementById('export_button');
+
+      draw();
+    }
+
+  </script>
+
+</head>
+
+<body onload="init();">
+
+<div id="network-popUp">
+    <span id="operation">Cadastro de Empresa</span> <br>
+    <table style="margin:auto;"><tr>
+        <td>CNPJ</td><td><input id="node-id" value="new value" /></td>
+    </tr>
+        <tr>
+            <td>Empresa</td><td><input id="node-label" value="new value" /></td>
+        </tr></table>
+    <input type="button" value="Salvar" id="saveButton" />
+    <input type="button" value="Cancelar" id="cancelButton" />
+</div>
+<br />
+<div id="network"></div>
+<p></p>
+<div>
+    <textarea id=input_output></textarea>
+    <input type="button" id="import_button" onclick="importNetwork()" value="Importar"></input>
+    <input type="button" id="export_button" onclick="exportNetwork()" value="Exportar"></input>
+</div>
+
+<script type="text/javascript">
+
+            function importNetwork() {
+				exportArea = document.getElementById('input_output');
+                var inputValue = exportArea.value;
+                var inputData = JSON.parse(inputValue);
+
+                var dataj = {
+                    nodes: getNodeData(inputData),
+                    edges: getEdgeData(inputData)
+                }
+
+				network = new vis.Network(container, dataj, {});
+
+                resizeExportArea();
+            }
+
+			function resizeExportArea() {
+                exportArea.style.height = (1 + exportArea.scrollHeight) + "px";
+            }
+
+            function exportNetwork() {
+                clearOutputArea();
+
+                var nodes = objectToArray(network.getPositions());
+
+                nodes.forEach(addConnections);
+
+                // pretty print node data
+                var exportValue = JSON.stringify(nodes, undefined, 2);
+
+                exportArea.value = exportValue;
+
+                resizeExportArea();
+            }
+
+            function clearOutputArea() {
+                exportArea.value = "";
+            }
+
+			function addConnections(elem, index) {
+                // need to replace this with a tree of the network, then get child direct children of the element
+                elem.connections = network.getConnectedNodes(index);
+            }
+
+			function objectToArray(obj) {
+                return Object.keys(obj).map(function (key) {
+                  obj[key].id = key;
+                  return obj[key];
+                });
+            }
+
+			function getNodeData(data) {
+                var networkNodes = [];
+
+                data.forEach(function(elem, index, array) {
+                    networkNodes.push({id: elem.id, label: elem.label, x: elem.x, y: elem.y});
+                });
+
+                return new vis.DataSet(networkNodes);
+            }
+
+            function getEdgeData(data) {
+                var networkEdges = [];
+
+                data.forEach(function(node) {
+                    // add the connection
+                    node.connections.forEach(function(connId, cIndex, conns) {
+                        networkEdges.push({from: node.id, to: connId});
+                        let cNode = getNodeById(data, connId);
+
+                        var elementConnections = cNode.connections;
+
+                        // remove the connection from the other node to prevent duplicate connections
+                        var duplicateIndex = elementConnections.findIndex(function(connection) {
+                          return connection == node.id; // double equals since id can be numeric or string
+                        });
+
+
+                        if (duplicateIndex != -1) {
+                          elementConnections.splice(duplicateIndex, 1);
+                        };
+                  });
+                });
+
+                return new vis.DataSet(networkEdges);
+            }
+
+            function getNodeById(data, id) {
+                for (var n = 0; n < data.length; n++) {
+                    if (data[n].id == id) {  // double equals since id can be numeric or string
+                      return data[n];
+                    }
+                };
+
+                throw 'Can not find id \'' + id + '\' in data';
+            }
+		init();
+        </script>
+
+</body>
+</html>
